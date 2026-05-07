@@ -76,7 +76,8 @@ class TestClauseType(unittest.TestCase):
 
     def test_next_clause(self) -> None:
         """测试获取下一个子句类型"""
-        self.assertEqual(ClauseType.CTE.next, ClauseType.SELECT)
+        self.assertEqual(ClauseType.CTE.next, ClauseType.NESTED_SUBQUERY)
+        self.assertEqual(ClauseType.NESTED_SUBQUERY.next, ClauseType.SELECT)
         self.assertEqual(ClauseType.SELECT.next, ClauseType.JOIN)
         self.assertEqual(ClauseType.JOIN.next, ClauseType.WHERE)
         self.assertEqual(ClauseType.WHERE.next, ClauseType.GROUP_BY)
@@ -90,7 +91,8 @@ class TestClauseType(unittest.TestCase):
     def test_previous_clause(self) -> None:
         """测试获取上一个子句类型"""
         self.assertIsNone(ClauseType.CTE.previous)
-        self.assertEqual(ClauseType.SELECT.previous, ClauseType.CTE)
+        self.assertEqual(ClauseType.NESTED_SUBQUERY.previous, ClauseType.CTE)
+        self.assertEqual(ClauseType.SELECT.previous, ClauseType.NESTED_SUBQUERY)
         self.assertEqual(ClauseType.JOIN.previous, ClauseType.SELECT)
         self.assertEqual(ClauseType.WHERE.previous, ClauseType.JOIN)
         self.assertEqual(ClauseType.GROUP_BY.previous, ClauseType.WHERE)
@@ -238,9 +240,10 @@ class TestEvolvingEngine(unittest.TestCase):
             engine = EvolvingEngine(registry=None, runner=self.runner)  # type: ignore
 
     def test_engine_initialization_invalid_runner(self) -> None:
-        """测试无效执行器初始化"""
-        with self.assertRaises(Exception):
-            engine = EvolvingEngine(registry=self.registry, runner=None)  # type: ignore
+        """测试无效执行器初始化（runner为None是允许的，用于preview模式）"""
+        engine = EvolvingEngine(registry=self.registry, runner=None)
+        self.assertIsNotNone(engine)
+        self.assertIsNone(engine._runner)
 
     def test_explore_basic(self) -> None:
         """测试基础探索功能"""
@@ -336,7 +339,10 @@ class TestEvolvingEngine(unittest.TestCase):
     def test_get_next_clause(self) -> None:
         """测试获取下一个子句"""
         self.assertEqual(
-            self.engine._get_next_clause(ClauseType.CTE), ClauseType.SELECT
+            self.engine._get_next_clause(ClauseType.CTE), ClauseType.NESTED_SUBQUERY
+        )
+        self.assertEqual(
+            self.engine._get_next_clause(ClauseType.NESTED_SUBQUERY), ClauseType.SELECT
         )
         self.assertEqual(
             self.engine._get_next_clause(ClauseType.SELECT), ClauseType.JOIN

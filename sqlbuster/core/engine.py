@@ -354,10 +354,19 @@ class EvolvingEngine:
             )
             node.add_child(error_node)
             yield error_node
+
+            next_clause = self._get_next_clause(current_clause)
+            if next_clause is not None:
+                yield from self._dfs_explore(node, next_clause)
             return
 
-        # 如果没有变体，直接返回
         if not variants:
+            next_clause = self._get_next_clause(current_clause)
+            # 特殊处理：如果当前是CTE，跳过SELECT（因为CTE已经包含了SELECT）
+            if current_clause == ClauseType.CTE:
+                next_clause = ClauseType.NESTED_SUBQUERY
+            if next_clause is not None:
+                yield from self._dfs_explore(node, next_clause)
             return
 
         # 对每个变体进行探索
@@ -821,6 +830,14 @@ class EvolvingEngine:
         try:
             variants = self._generate_clause_variants(current_clause)
         except Exception:
+            variants = []
+
+        if not variants:
+            next_clause = current_clause.next
+            if current_clause == ClauseType.CTE:
+                next_clause = ClauseType.NESTED_SUBQUERY
+            if next_clause is not None:
+                self._dfs_preview(current_sql, next_clause, sql_list, max_sql_count)
             return
 
         for variant in variants:
